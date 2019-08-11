@@ -1,0 +1,38 @@
+#ifndef settings_h
+#define settings_h
+
+// User defined settings
+#define CONTROLLER_AUTOSEND true
+
+// ssid to connect
+#define STA_ssid "your wifi router name"
+#define STA_password "wifi password"
+
+// ssid in access point mode
+#define AP_ssid "VectorBRD"
+#define AP_password "vector963379"
+
+#define BATTERY_CAPACITY 43.0 // in Ah
+#define FULL_VOLTAGE 50.0 // full charged battery voltage
+#define EMPTY_VOLTAGE 36.0 // empty battery voltage
+#define CHARGER_CURRENT 10 // for charge via engine, in A (not used at this time)
+#define LI_ION_BATTERY_TYPE true // set to true if your battery is li-ion type
+#define WHEEL_DIAMETER 610
+#define WHEEL_PHASES 138
+#define CurrPerDigit 48.34
+
+// serial speed rate
+#define SerialBaudRate 115200L 
+#define NexBaudRate 9600
+#define BtBaudRate 38400L
+
+// HC-05 bluetooth adapter settings
+#define RX_BT 25 // RX port
+#define TX_BT 26 // TX port
+
+// LED pins
+#define LED_DIN 0
+#define LED_CLK 0
+#define LED_CS 0
+
+#endif
