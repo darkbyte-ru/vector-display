@@ -13,7 +13,7 @@ float Diametr1 = WHEEL_DIAMETER;
 float PhasesPerRev1 = WHEEL_PHASES;
 
 void bluetoothTask(void *pvParameters) {  
-    BTserial.begin(BtBaudRate, SERIAL_8N2, RX_BT, TX_BT); // 8N2 is not the default settings (8N1)
+    BTserial.begin(BtBaudRate, SERIAL_8N1, RX_BT, TX_BT);
     BTserial.setRxBufferSize(1024);
 
     for(;;) {
@@ -34,6 +34,8 @@ void bluetoothTask(void *pvParameters) {
 
         while(BTserial.available()) {
             data = BTserial.read();
+
+            _uart_rx_count++;
 
             if(data == 0xFF && prevData == 0xFF) {
                 packetLength = BTserial.read();
@@ -61,6 +63,7 @@ void bluetoothTask(void *pvParameters) {
                     int calcCrc = calculateCRC(packetType, packetLength, packetData);
 
                     if(crc != calcCrc) {
+                        Serial.println(F("Got data, but invalid CRC"));
                         continue;
                     }
 

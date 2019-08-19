@@ -68,4 +68,6 @@ extern volatile MaxData maxData;
 extern volatile unsigned long lastDataSeen;
 extern volatile float ahDelta;
 extern volatile bool gotData;
+extern volatile unsigned long _uart_rx_count;
+
 #endif

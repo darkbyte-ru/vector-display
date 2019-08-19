@@ -7,11 +7,9 @@
 
 // internal
 // DO NOT change anything below this line if you don't know what you do
-//LedControl lc = LedControl(LED_DIN, LED_CLK, LED_CS, 1); // Pins: DIN,CLK,CS, # of Display connected
 #ifdef UseLedBar
+LedControl lc = LedControl(LED_DIN, LED_CLK, LED_CS, 1); // Pins: DIN,CLK,CS, # of Display connected
 #endif
-
-
 
 void setup(void)
 {
@@ -217,9 +215,6 @@ void loop(void) {
 #endif
 
     byte page = nex.getCurrentPage();
-
-    //Serial.print(page);
-    //Serial.print(" ");
 
     // settings page
     if(page == 3) {
@@ -537,5 +532,11 @@ void setupNoDataScreen(void) {
 #endif  
   splash.show();
   status.setText("Waiting for the data...");
-  version.setText(VERSION);
+  if(_uart_rx_count > 0){
+    static char dataLabel[10];  
+    sprintf(dataLabel, "%d", _uart_rx_count);
+    version.setText(dataLabel);
+  }else{
+    version.setText(VERSION);
+  }
 }
