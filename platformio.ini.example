@@ -1,0 +1,33 @@
+; PlatformIO Project Configuration File
+;
+;   Build options: build flags, source filter
+;   Upload options: custom upload port, speed and extra flags
+;   Library options: dependencies, extra library storages
+;   Advanced options: extra scripting
+;
+; Please visit documentation for the other options and examples
+; https://docs.platformio.org/page/projectconf.html
+
+[platformio]
+data_dir = ./data
+
+[env:esp32dev]
+platform = https://github.com/platformio/platform-espressif32.git#feature/stage
+board = esp32dev
+framework = arduino
+monitor_speed = 115200
+#upload_speed = 921600
+
+board_build.flash_mode = qio
+
+#Upload via wire
+upload_port = COM12
+upload_protocol = esptool
+upload_speed = 115200
+
+# Upload by the air
+#upload_port = 192.168.12.165
+#upload_protocol = espota
+#upload_flags =
+#  --port=3232 
+; each flag in a new line
