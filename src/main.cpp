@@ -11,6 +11,11 @@
 LedControl lc = LedControl(LED_DIN, LED_CLK, LED_CS, 1); // Pins: DIN,CLK,CS, # of Display connected
 #endif
 
+WiFiUDP ntpUDP; 
+NTPClient timeClient(ntpUDP, "europe.pool.ntp.org", 3600, 60000);
+
+//Adafruit_BME280 bme; // I2C 
+
 void setup(void)
 {
     Serial.begin(SerialBaudRate);
@@ -18,14 +23,6 @@ void setup(void)
 
     if (!rtc.begin()) {
       Serial.println(F("Couldn't find RTC"));
-    } else {
-      if (rtc.lostPower()) {
-        Serial.println(F("RTC lost power, lets set the time!"));
-        // following line sets the RTC to the date & time this sketch was compiled
-        rtc.adjust(DateTime(F(__DATE__), F(__TIME__)));
-      } else {
-        Serial.println(F("Clock working, time set"));
-      }
     }
 
 
@@ -83,6 +80,10 @@ void setup(void)
       WiFi.softAP(AP_ssid, AP_password);
     }
 
+    timeClient.begin();
+
+    //unsigned int bmestatus = bme.begin();
+    //Serial.println(bmestatus);
     delay(500);
 
     ArduinoOTA.setHostname("Vortex");
@@ -131,6 +132,12 @@ void setup(void)
 
   initWebServer();
 
+  status.setText("Syncthing the time...");
+  if(timeClient.update()){
+    rtc.adjust(DateTime(timeClient.getEpochTime() + TIMEZONE_OFFSET));
+    timeClient.end();
+  }
+
   status.setText("Waiting for the data...");
 
   setupNoDataScreen();
@@ -144,13 +151,13 @@ void loop(void) {
   ArduinoOTA.handle();
 
   if((millis() - lastDataSeen) > (10 * 1000)) {
-    if(initialized && gotData && lastDataSeen != 0) {
+    if(initialized && currentDataChanged && lastDataSeen != 0) {
       initialized = false;
       setupNoDataScreen();
     }
   } else {
-    if(!initialized && gotData) {
-      if(firstRun) {
+    if(!initialized && currentDataChanged) {
+      if(false && firstRun) {//TODO uncomment
         Serial.println(F("First run detected"));
         firstRun = false; // do this check only once at startup
 
@@ -161,7 +168,8 @@ void loop(void) {
 
         boolean ahReset = false;
 
-        if(voltageInROM < (int)currentData.voltage) {
+        //check with little gap to obtain voltage 
+        if(voltageInROM < (int)currentData.voltage - 2) {
           ahReset = true;
         }
 
@@ -181,6 +189,8 @@ void loop(void) {
           status.setText("Reseting Ah counters...");
           
           sendResetAh();
+          sendResetTrip();
+          
           delay(1000);
 
           status.setText("Locking the controller...");
@@ -208,34 +218,34 @@ void loop(void) {
     }
   }
 
-  if(initialized && gotData) {
+  if(initialized && currentDataChanged) {
 #ifdef UseLedBar
     displaySpeed(currentData.speed);
     displayPower(fabs(currentData.voltage * currentData.current));
 #endif
 
     byte page = nex.getCurrentPage();
+    if(page == 0)page = nex.getCurrentPage();
 
-    // settings page
-    if(page == 3) {
-      if(prevPageWas != 3)
-        displayButtons();
-      delay(100);
-    }else
+    if(page){
+      currentDataChanged = false;
 
-    // statistics page
-    if(page == 2) {
-      displayStatistics();
-      // do some delay, because no need to fast update this info
-      delay(500);
-    }else
+      // settings page
+      if(page == 3) {
+        if(prevPageWas != 3)
+          displayButtons();
+      }else
 
-    // main page
-    if(page == 1) {
-      displayTFTData();
-      displayAhBar();
-      showDate();
-      delay(250);
+      // statistics page
+      if(page == 2) {
+        displayStatistics();
+      }else
+
+      // main page
+      if(page == 1) {
+        displayTFTData();
+        showDate();
+      }
     }
 
     prevPageWas = page;
@@ -244,100 +254,89 @@ void loop(void) {
 
 
 void displayTFTData() {
-  static char speedb[1];
-  dtostrf(currentData.speed, 2, 0, speedb);
-  speed.setText(speedb);
 
-  static char voltageb[4];
-  dtostrf(currentData.voltage, 5, 2, voltageb);
-  voltage.setText(voltageb);
+  static char strbuf[10];
+  dtostrf(currentData.speed, 2, 0, strbuf);
+  speed.setText(strbuf);
+
+  dtostrf(currentData.voltage, 5, 1, strbuf);
+  voltage.setText(strbuf);
   
-  static char currentb[5];
     
   if (fabs(currentData.current) > 100) {
-    dtostrf(currentData.current, 6, 0, currentb);
+    dtostrf(currentData.current, 6, 0, strbuf);
   } else if (fabs(currentData.current) > 10) {
-    dtostrf(currentData.current, 6, 1, currentb);
+    dtostrf(currentData.current, 6, 1, strbuf);
   } else {
-    dtostrf(currentData.current, 6, 2, currentb);
+    dtostrf(currentData.current, 6, 2, strbuf);
   }
-  current.setText(currentb);
+  current.setText(strbuf);
 
-  static char tempContb[5];
-  dtostrf(currentData.tempCont, 6, 1, tempContb);
-  tempCont.setText(tempContb);
+  dtostrf(currentData.tempCont, 6, 1, strbuf);
+  tempCont.setText(strbuf);
 
-  static char tempEngineb[5];
-  dtostrf(currentData.tempEngine, 6, 1, tempEngineb);
-  tempEngine.setText(tempEngineb);
+  dtostrf(currentData.tempEngine, 6, 1, strbuf);
+  tempEngine.setText(strbuf);
 
-  static char ahb[4];
-  dtostrf(fabs(currentData.ah), 5, 1, ahb);
-  ah.setText(ahb);
+  dtostrf(fabs(currentData.ah), 5, 1, strbuf);
+  ah.setText(strbuf);
 
-  static char ahRegenb[4];
-  dtostrf(fabs(currentData.ahRegen), 5, 1, ahRegenb);
-  ahRegen.setText(ahRegenb);
+  dtostrf((fabs(currentData.ahRegen)/currentData.ah)*100, 3, 1, strbuf);
+  sprintf(strbuf, "%s%%", strbuf);
+  ahRegen.setText(strbuf);
 
-  static char distanceb[6];
-  static char distanceKm[9];
-  dtostrf(currentData.distance, 7, 2, distanceb);
-  sprintf(distanceKm,"%s km", distanceb);
-  distance.setText(distanceKm);
+  dtostrf(currentData.distance, 7, 2, strbuf);
+  sprintf(strbuf, "%s km", strbuf);
+  distance.setText(strbuf);
 
-  static char odometerb[6];
-  static char odometerKm[9];
-  dtostrf(currentData.odometer, 7, 0, odometerb);
-  sprintf(odometerKm,"%s km", odometerb);
-  odometer.setText(odometerKm);
+  dtostrf(currentData.odometer, 7, 0, strbuf);
+  sprintf(strbuf,"%s km", strbuf);
+  odometer.setText(strbuf);
 
-  static char powerb[4];
-  dtostrf(currentData.voltage * currentData.current, 5, 0, powerb);
-  power.setText(powerb);
-}
+  dtostrf(currentData.voltage * currentData.current, 5, 0, strbuf);
+  power.setText(strbuf);
 
-void displayAhBar() {
   ahBar.setValue(100 - (fabs(currentData.ah - currentData.ahRegen) / (BATTERY_CAPACITY / 100)));
+
+  //TODO: some exception that crash esp
+  //bme.readTemperature();
+  //dtostrf(bme.readTemperature(), 4, 1, strbuf);
+  outTemp.setText("");
 }
 
 void displayStatistics() {
-  static char speedb[1];
-  dtostrf(maxData.speed, 2, 0, speedb);
-  maxSpeed.setText(speedb);
+  static char strbuf[10];
+  dtostrf(maxData.speed, 2, 0, strbuf);
+  maxSpeed.setText(strbuf);
 
-  static char currentb[5];
   if (maxData.current > 100) {
-    dtostrf(maxData.current, 6, 0, currentb);
+    dtostrf(maxData.current, 6, 0, strbuf);
   } else if (maxData.current > 10) {
-    dtostrf(maxData.current, 6, 1, currentb);
+    dtostrf(maxData.current, 6, 1, strbuf);
   } else {
-    dtostrf(maxData.current, 6, 2, currentb);
+    dtostrf(maxData.current, 6, 2, strbuf);
   }
-  maxA.setText(currentb);
+  maxA.setText(strbuf);
 
-  static char currentbr[5];
   if (maxData.currentRegen < 100) {
-    dtostrf(maxData.currentRegen, 6, 0, currentbr);
+    dtostrf(maxData.currentRegen, 6, 0, strbuf);
   } else if (maxData.currentRegen < 10) {
-    dtostrf(maxData.currentRegen, 6, 1, currentbr);
+    dtostrf(maxData.currentRegen, 6, 1, strbuf);
   } else {
-    dtostrf(maxData.currentRegen, 6, 2, currentbr);
+    dtostrf(maxData.currentRegen, 6, 2, strbuf);
   }
-  maxARegen.setText(currentbr);
+  maxARegen.setText(strbuf);
 
-  static char tempContb[5];
-  dtostrf(maxData.tempCont, 6, 1, tempContb);
-  maxEngT.setText(tempContb);
+  dtostrf(maxData.tempEngine, 6, 1, strbuf);
+  maxEngT.setText(strbuf);
 
-  static char tempEngineb[5];
-  dtostrf(maxData.tempEngine, 6, 1, tempEngineb);
-  maxContT.setText(tempEngineb);
+  dtostrf(maxData.tempCont, 6, 1, strbuf);
+  maxContT.setText(strbuf);
 
   long rideInMs = millis();                     
   int hours = (rideInMs % DAY_MS) / HOUR_MS;                    
   int minutes = ((rideInMs % DAY_MS) % HOUR_MS) / MINUTE_MS;
 
-  char charBuf[6];
   String hourStr;
   String minuteStr;
 
@@ -354,8 +353,35 @@ void displayStatistics() {
   }
 
   String rTimeStr = hourStr + ":" + minuteStr;
-  rTimeStr.toCharArray(charBuf, 6);
-  rideTime.setText(charBuf);
+  rTimeStr.toCharArray(strbuf, 6);
+  rideTime.setText(strbuf);
+
+  if(currentData.distance > 0){
+    float wattPerKm = ((currentData.ah - currentData.ahRegen)*BATTERY_NOMINAL_VOLTAGE)/currentData.distance;
+    dtostrf(wattPerKm, 6, 1, strbuf);
+    wattKm.setText(strbuf);
+
+    long int kmforfull = (BATTERY_CAPACITY*BATTERY_NOMINAL_VOLTAGE)/wattPerKm;
+    dtostrf(kmforfull, 6, 1, strbuf);
+    kmfull.setText(strbuf);
+
+    long int kmforleft = ((currentData.ah - currentData.ahRegen)*BATTERY_NOMINAL_VOLTAGE)/wattPerKm;
+    dtostrf(kmforleft, 6, 1, strbuf);
+    kmleft.setText(strbuf);
+  }
+
+  dtostrf(currentData.volt3v3, 3, 1, strbuf);
+  volt3v3.setText(strbuf);
+
+  dtostrf(currentData.volt5v0, 3, 1, strbuf);
+  volt5v0.setText(strbuf);
+
+  dtostrf(currentData.volt12v0, 4, 1, strbuf);
+  volt12v0.setText(strbuf);
+
+  dtostrf(currentData.voltage, 4, 1, strbuf);
+  voltbat.setText(strbuf);
+
 }
 
 void unlockButtonPress(NextionEventType type, INextionTouchable *widget)

@@ -5,12 +5,18 @@
 #include <HardwareSerial.h>
 #include <ArduinoOTA.h>
 
+#include <NTPClient.h>
+#include <WiFiUdp.h>
+
 //#include <LedControl.h>
 
 #include <shared.h>
 #include <settings.h>
 #include <bluetooth.h>
 #include <web.h>
+
+//#include <SPI.h> 
+//#include <Adafruit_BME280.h> 
 
 unsigned int voltageInROM;
 
@@ -37,6 +43,8 @@ NextionText power(nex, 1, 14, "watts");
 NextionText dateLabel(nex, 1, 1, "date");
 NextionText timeLabel(nex, 1, 2, "time");
 NextionProgressBar ahBar(nex, 1, 11, "ahBar");
+NextionText outTemp(nex, 1, 21, "outTemp");
+
 
 //stats screen
 NextionText maxA(nex, 2, 11, "maxA");
@@ -46,6 +54,13 @@ NextionText maxContT(nex, 2, 14, "maxContT");
 NextionText maxSpeed(nex, 2, 10, "maxSpeed");
 NextionText wattKm(nex, 2, 15, "wattKm");
 NextionText rideTime(nex, 2, 16, "rideTime");
+NextionText kmleft(nex, 2, 19, "kmleft");
+NextionText kmfull(nex, 2, 21, "kmfull");
+NextionText volt3v3(nex, 2, 22, "volt3v3");
+NextionText volt5v0(nex, 2, 23, "volt5v0");
+NextionText volt12v0(nex, 2, 24, "volt12v0");
+NextionText voltbat(nex, 2, 25, "voltbat");
+
 
 //actions screen
 NextionText chargeState(nex, 3, 5, "chargeState");
@@ -55,6 +70,8 @@ NextionDualStateButton chargeModeButton(nex, 3, 8, "chargeMode");
 NextionDualStateButton resetAhButton(nex, 3, 9, "resetAh");
 NextionDualStateButton resetDistanceButton(nex, 3, 10, "resetDistance");
 NextionDualStateButton unlockButton(nex, 3, 11, "unlockBtn");
+//NextionSlider throttleValue(nex, 3, 12, "throttleValue");
+//NextionCheckbox throttleEnable(nex, 3, 13, "throttleEnable");
 
 boolean initialized = false;
 boolean firstRun = true;
