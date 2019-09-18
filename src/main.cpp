@@ -143,6 +143,7 @@ void setup(void)
   setupNoDataScreen();
 }
 
+unsigned long lastScreenRefresh = 0;
 
 void loop(void) {
   //delay(10);
@@ -218,14 +219,18 @@ void loop(void) {
     }
   }
 
-  if(initialized && currentDataChanged) {
+  //limit refresh rate because TFT can not get in time
+  if(initialized && currentDataChanged && ((millis() - lastScreenRefresh) > 500)) {
 #ifdef UseLedBar
     displaySpeed(currentData.speed);
     displayPower(fabs(currentData.voltage * currentData.current));
 #endif
 
+    lastScreenRefresh = millis();
+
     byte page = nex.getCurrentPage();
     if(page == 0)page = nex.getCurrentPage();
+    //if(page == 0)main.show(); tft bug
 
     if(page){
       currentDataChanged = false;
@@ -246,9 +251,9 @@ void loop(void) {
         displayTFTData();
         showDate();
       }
+      prevPageWas = page;
     }
 
-    prevPageWas = page;
   }
 }
 
@@ -256,58 +261,89 @@ void loop(void) {
 void displayTFTData() {
 
   static char strbuf[10];
-  dtostrf(currentData.speed, 2, 0, strbuf);
-  speed.setText(strbuf);
+  //speed was below zero while breaks
+  dtostrf(fabs(currentData.speed), 2, 0, strbuf);
+  if(!speed.setText(strbuf)) return;
 
   dtostrf(currentData.voltage, 5, 1, strbuf);
-  voltage.setText(strbuf);
-  
+  if(!voltage.setText(strbuf)) return;
+ 
     
   if (fabs(currentData.current) > 100) {
-    dtostrf(currentData.current, 6, 0, strbuf);
+    dtostrf(currentData.current, 5, 0, strbuf);
   } else if (fabs(currentData.current) > 10) {
-    dtostrf(currentData.current, 6, 1, strbuf);
+    dtostrf(currentData.current, 5, 1, strbuf);
   } else {
-    dtostrf(currentData.current, 6, 2, strbuf);
+    dtostrf(currentData.current, 5, 2, strbuf);
   }
-  current.setText(strbuf);
+  if(!current.setText(strbuf)) return;
 
-  dtostrf(currentData.tempCont, 6, 1, strbuf);
-  tempCont.setText(strbuf);
+  dtostrf(currentData.tempCont, 5, 1, strbuf);
+  if(!tempCont.setText(strbuf)) return;
 
-  dtostrf(currentData.tempEngine, 6, 1, strbuf);
-  tempEngine.setText(strbuf);
+  if(currentData.tempEngine >= 100){
+    dtostrf(currentData.tempEngine, 5, 1, strbuf);
+  }else{
+    dtostrf(currentData.tempEngine, 4, 1, strbuf);
+  }
+  if(!tempEngine.setText(strbuf)) return;
 
   dtostrf(fabs(currentData.ah), 5, 1, strbuf);
-  ah.setText(strbuf);
+  if(!ah.setText(strbuf)) return;
 
-  dtostrf((fabs(currentData.ahRegen)/currentData.ah)*100, 3, 1, strbuf);
-  sprintf(strbuf, "%s%%", strbuf);
-  ahRegen.setText(strbuf);
+  if(currentData.ah > 0.1){
+    dtostrf((currentData.ahRegen/currentData.ah)*100, 3, 1, strbuf);
+    sprintf(strbuf, "%s%%", strbuf);
+    if(!ahRegen.setText(strbuf)) return;
+  }else{
+    if(!ahRegen.setText("0.0%")) return;
+  }
 
   dtostrf(currentData.distance, 7, 2, strbuf);
   sprintf(strbuf, "%s km", strbuf);
-  distance.setText(strbuf);
+  if(!distance.setText(strbuf)) return;
 
   dtostrf(currentData.odometer, 7, 0, strbuf);
   sprintf(strbuf,"%s km", strbuf);
-  odometer.setText(strbuf);
+  if(!odometer.setText(strbuf)) return;
 
-  dtostrf(currentData.voltage * currentData.current, 5, 0, strbuf);
-  power.setText(strbuf);
+  dtostrf(currentData.voltage * currentData.current, 4, 0, strbuf);
+  if(!power.setText(strbuf)) return;
 
   ahBar.setValue(100 - (fabs(currentData.ah - currentData.ahRegen) / (BATTERY_CAPACITY / 100)));
+
+  if(currentData.distance > 0.1 && currentData.ah > 0.1){
+    float wattPerKm = ((currentData.ah - currentData.ahRegen)*BATTERY_NOMINAL_VOLTAGE)/currentData.distance;
+    //dtostrf(wattPerKm, 6, 1, strbuf);
+    //wattKm.setText(strbuf) || return;
+
+    long int kmforleft = ((BATTERY_CAPACITY - currentData.ah + currentData.ahRegen)*BATTERY_NOMINAL_VOLTAGE)/wattPerKm;
+    dtostrf(kmforleft, 4, 0, strbuf);
+    sprintf(strbuf,"%s km", strbuf);
+    if(!kmleftavg.setText(strbuf)) return;
+  }else{
+    if(!kmleftavg.setText("-- km")) return;
+  }
+
+  if(currentData.speed > 0 && currentData.current > 1){
+    float f_kmleftperbatt = (((BATTERY_CAPACITY - currentData.ah + currentData.ahRegen)*BATTERY_NOMINAL_VOLTAGE)/(currentData.voltage * currentData.current))*currentData.speed;
+    dtostrf(f_kmleftperbatt, 4, 0, strbuf);
+    sprintf(strbuf,"%s km", strbuf);
+    if(!kmleftperbatt.setText(strbuf)) return;
+  }else{
+    if(!kmleftperbatt.setText("~ km")) return;
+  }
 
   //TODO: some exception that crash esp
   //bme.readTemperature();
   //dtostrf(bme.readTemperature(), 4, 1, strbuf);
-  outTemp.setText("");
+  if(!outTemp.setText("")) return;
 }
 
 void displayStatistics() {
   static char strbuf[10];
-  dtostrf(maxData.speed, 2, 0, strbuf);
-  maxSpeed.setText(strbuf);
+  dtostrf(fabs(maxData.speed), 2, 0, strbuf);
+  if(!maxSpeed.setText(strbuf)) return;
 
   if (maxData.current > 100) {
     dtostrf(maxData.current, 6, 0, strbuf);
@@ -316,7 +352,7 @@ void displayStatistics() {
   } else {
     dtostrf(maxData.current, 6, 2, strbuf);
   }
-  maxA.setText(strbuf);
+  if(!maxA.setText(strbuf)) return;
 
   if (maxData.currentRegen < 100) {
     dtostrf(maxData.currentRegen, 6, 0, strbuf);
@@ -325,13 +361,13 @@ void displayStatistics() {
   } else {
     dtostrf(maxData.currentRegen, 6, 2, strbuf);
   }
-  maxARegen.setText(strbuf);
+  if(!maxARegen.setText(strbuf)) return;
 
   dtostrf(maxData.tempEngine, 6, 1, strbuf);
-  maxEngT.setText(strbuf);
+  if(!maxEngT.setText(strbuf)) return;
 
   dtostrf(maxData.tempCont, 6, 1, strbuf);
-  maxContT.setText(strbuf);
+  if(!maxContT.setText(strbuf)) return;
 
   long rideInMs = millis();                     
   int hours = (rideInMs % DAY_MS) / HOUR_MS;                    
@@ -354,33 +390,33 @@ void displayStatistics() {
 
   String rTimeStr = hourStr + ":" + minuteStr;
   rTimeStr.toCharArray(strbuf, 6);
-  rideTime.setText(strbuf);
+  if(!rideTime.setText(strbuf)) return;
 
-  if(currentData.distance > 0){
+  if(currentData.distance > 0.1 && currentData.ah > 0.1){
     float wattPerKm = ((currentData.ah - currentData.ahRegen)*BATTERY_NOMINAL_VOLTAGE)/currentData.distance;
     dtostrf(wattPerKm, 6, 1, strbuf);
-    wattKm.setText(strbuf);
+    if(!wattKm.setText(strbuf)) return;
 
     long int kmforfull = (BATTERY_CAPACITY*BATTERY_NOMINAL_VOLTAGE)/wattPerKm;
     dtostrf(kmforfull, 6, 1, strbuf);
-    kmfull.setText(strbuf);
+    if(!kmfull.setText(strbuf)) return;
 
-    long int kmforleft = ((currentData.ah - currentData.ahRegen)*BATTERY_NOMINAL_VOLTAGE)/wattPerKm;
+    long int kmforleft = ((BATTERY_CAPACITY - currentData.ah + currentData.ahRegen)*BATTERY_NOMINAL_VOLTAGE)/wattPerKm;
     dtostrf(kmforleft, 6, 1, strbuf);
-    kmleft.setText(strbuf);
+    if(!kmleft.setText(strbuf)) return;
   }
 
   dtostrf(currentData.volt3v3, 3, 1, strbuf);
-  volt3v3.setText(strbuf);
+  if(!volt3v3.setText(strbuf)) return;
 
   dtostrf(currentData.volt5v0, 3, 1, strbuf);
-  volt5v0.setText(strbuf);
+  if(!volt5v0.setText(strbuf)) return;
 
   dtostrf(currentData.volt12v0, 4, 1, strbuf);
-  volt12v0.setText(strbuf);
+  if(!volt12v0.setText(strbuf)) return;
 
   dtostrf(currentData.voltage, 4, 1, strbuf);
-  voltbat.setText(strbuf);
+  if(!voltbat.setText(strbuf)) return;
 
 }
 
@@ -536,11 +572,12 @@ void showDate() {
   DateTime now = rtc.now();
   static char dataLabel[10];  
   
-  sprintf(dataLabel, "%02d:%02d", now.hour(), now.minute());
-  timeLabel.setText(dataLabel);
+  sprintf(dataLabel, "%02d:%02d:%02d", now.hour(), now.minute(), now.second());
+  if(!timeLabel.setText(dataLabel)) return;
   
   sprintf(dataLabel, "%02d.%02d.%04d", now.day(), now.month(), now.year());
-  dateLabel.setText(dataLabel);
+  if(!dateLabel.setText(dataLabel)) return;
+
 } 
 
 void setupScreen(void) {

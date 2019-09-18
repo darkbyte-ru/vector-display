@@ -44,7 +44,8 @@ NextionText dateLabel(nex, 1, 1, "date");
 NextionText timeLabel(nex, 1, 2, "time");
 NextionProgressBar ahBar(nex, 1, 11, "ahBar");
 NextionText outTemp(nex, 1, 21, "outTemp");
-
+NextionText kmleftperbatt(nex, 1, 26, "kmleftperbatt");
+NextionText kmleftavg(nex, 1, 27, "kmleftavg");
 
 //stats screen
 NextionText maxA(nex, 2, 11, "maxA");

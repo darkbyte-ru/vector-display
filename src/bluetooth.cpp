@@ -62,10 +62,8 @@ void bluetoothTask(void *pvParameters) {
 
                     currentData.ImpNa1M = 100.0 / (WHEEL_DIAMETER * (PI/10) / WHEEL_PHASES);
 
-                    currentData.speed = packetData5.Spd1Fl;
-                    if(currentData.speed > 200) {
-                        currentData.speed = 0; // FIXME bug with enabled regen
-                    }
+                    //speed is negative while REGEN enabled
+                    currentData.speed = fabs(packetData5.Spd1Fl);
 
                     currentData.voltage = (float)packetData5.UBT/10;
                     currentData.tempCont = (float)packetData5.Temperature2/10;
